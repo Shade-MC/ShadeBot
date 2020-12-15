@@ -73,4 +73,8 @@ async def bully(ctx):
 async def gay(ctx):
     await ctx.send(file=discord.File('youGay.png'))
 
+@client.command()
+async def catgirl(ctx):
+    await ctx.send(file=discord.File('Bella.png'))
+
 client.run(TOKEN)
