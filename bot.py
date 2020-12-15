@@ -20,6 +20,8 @@ with open('insults.txt') as file:
     for line in file:
         insults.append(line)
 
+
+
 @client.event
 async def on_ready():
     print(f'{client.user} has connected to Discord!')
@@ -58,7 +60,7 @@ async def on_voice_state_update(member,before,after):
 
 @client.command()
 async def bully(ctx):
-    if random.choice(range(0,100)) == 100:
+    if random.choice(range(100)) == 0:
         if len(ctx.message.mentions) == 0:
             await ctx.send("{} {}".format(ctx.author.mention, " is the coolest"))
         else:
@@ -75,6 +77,9 @@ async def gay(ctx):
 
 @client.command()
 async def catgirl(ctx):
-    await ctx.send(file=discord.File('Bella.png'))
+    if random.choice(range(10)) == 9:
+        await ctx.send(file=discord.File('cap yeet.jpg'))
+    else:
+        await ctx.send(file=discord.File('Bella.png'))
 
 client.run(TOKEN)
