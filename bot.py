@@ -5,29 +5,33 @@ import time
 import random
 import discord
 import re
-from discord import VoiceState
+from discord.ext import commands
 from discord.ext.commands import Bot
 from dotenv import load_dotenv
 
-guildDict = {}
-
-load_dotenv('.env')
-TOKEN = os.getenv('DISCORD_TOKEN')
 
 client = Bot(command_prefix='!')
+load_dotenv('.env')
 
-insults = []
-with open('insults.txt') as file:
-    for line in file:
-        insults.append(line)
+async def load_channel(guild, name):
+    if find_channel(guild, name) is None:
+        return await guild.create_voice_channel(name)
+    else:
+        return find_channel(guild, name)
 
+
+def find_channel(guild, name):
+    for channel in guild.channels:
+        if channel.name == name:
+            return channel
+    return None
 
 
 @client.event
 async def on_ready():
     print(f'{client.user} has connected to Discord!')
     for guild in client.guilds:
-        guildDict[guild] = {'scrim': False, 'funnyMeme': False}
+        guildDict[guild] = {'funnyMeme': False, 'Scrim Lobby': await load_channel(guild, 'Scrim Lobby')}
         for channel in guild.voice_channels:
             if channel.user_limit == 1:
                 guildDict[guild]["lonely"] = channel
@@ -67,39 +71,63 @@ async def on_voice_state_update(member, before, after):
                     print(f'{member.nick} sent to the lonely corner')
 
 
-@client.command()
-async def scrim(ctx):
-    if not guildDict[ctx.guild]['scrim']:
-        guildDict[ctx.guild]['scrim'] = True
+# @client.command()
+# async def scrim(ctx):
+#     if not guildDict[ctx.guild]['scrim']:
+#         guildDict[ctx.guild]['scrim'] = True
+#
+#         guildDict[ctx.guild]['scrimLobby'] = await ctx.guild.create_voice_channel('Scrim Lobby')
+#         await ctx.send("Everyone join the scrim lobby.\n When ready send the start command")
 
-        guildDict[ctx.guild]['scrimLobby'] = await ctx.guild.create_voice_channel('Scrim Lobby')
-        await ctx.send("Everyone join the scrim lobby.\n When ready send the start command")
 
-
-
-@client.command()
+@client.command(brief=os.getenv('START_BRIEF'), description=os.getenv('START_DESCRIPTION'))
 async def start(ctx):
-    if not guildDict[ctx.guild]['scrim']:
-        await ctx.send("Send the 'scrim' command to set up the lobby first")
+    if guildDict[ctx.guild]['Scrim Lobby'] is None:
+        await ctx.send("Some shitty programmer just fuck up. Sorry!\nDon't worry i'll fix it\n"
+                       "Feel free to join the 'Scrim Lobby' and try again")
+        guildDict[ctx.guild]['Scrim Lobby'] = await load_channel(ctx.guild, 'Scrim Lobby')
         return -1
-    guildDict[ctx.guild]['teamA'] = await ctx.guild.create_voice_channel('teamA')
-    guildDict[ctx.guild]['teamB'] = await ctx.guild.create_voice_channel('teamB')
+    guildDict[ctx.guild]['teamA'] = await load_channel(ctx.guild, 'teamA')
+    guildDict[ctx.guild]['teamB'] = await load_channel(ctx.guild, 'teamB')
 
-    bus = guildDict[ctx.guild]['scrimLobby'].members
-    random.shuffle(bus)
+    bus = guildDict[ctx.guild]['Scrim Lobby'].members
 
-    for index, child in enumerate(bus):
-        if index % 2:
-            await child.move_to(guildDict[ctx.guild]['teamA'])
-        else:
-            await child.move_to(guildDict[ctx.guild]['teamB'])
+    await distribute(bus, [guildDict[ctx.guild]['teamA'], guildDict[ctx.guild]['teamB']])
 
 
-@client.command()
+async def distribute(roster, destinations):
+    print(roster)
+    random.shuffle(roster)
+    print(roster)
+    print(destinations)
+    random.shuffle(destinations)
+    print(destinations)
+    for i, cannonFodder in enumerate(roster):
+        await cannonFodder.move_to(destinations[i % len(destinations)])
+
+
+@client.command(brief=os.getenv('chaos_brief'), description=os.getenv('chaos_description'))
+async def chaos(ctx):
+    if ctx.guild.permissions_for(ctx.author).move_members or ctx.author.id == int(os.getenv('SHADE_ID')):
+        channelList = []
+        memberList = []
+        for channel in ctx.guild.voice_channels:
+            channelList.append(channel)
+            memberList += channel.members
+        await distribute(memberList, channelList)
+
+
+@client.command(brief=os.getenv('scramble_brief'), description=os.getenv('scramble_description'))
 async def scramble(ctx):
-    if guildDict[ctx.guild]['scrim']:
-
-        roster = guildDict[ctx.guild]['scrimLobby'].members + guildDict[ctx.guild]['teamB'].members + guildDict[ctx.guild]['teamA'].members
+    if guildDict[ctx.guild]['teamA'] is None or guildDict[ctx.guild]['teamA'] is None or \
+            guildDict[ctx.guild]['Scrim Lobby'] is None:
+        await ctx.send("Oops looks like some of the channels for this command are missing,\n "
+                       "Don't worry i'll remake them, feel free to try the command again")
+        guildDict[ctx.guild]['teamA'] = await load_channel(ctx.guild, 'teamA')
+        guildDict[ctx.guild]['teamB'] = await load_channel(ctx.guild, 'teamB')
+        guildDict[ctx.guild]['Scrim Lobby'] = await load_channel(ctx.guild, 'Scrim Lobby')
+    else:
+        roster = guildDict[ctx.guild]['Scrim Lobby'].members + guildDict[ctx.guild]['teamB'].members + guildDict[ctx.guild]['teamA'].members
         print(roster)
         random.shuffle(roster)
         print(roster)
@@ -118,44 +146,44 @@ async def scramble(ctx):
                     await child.move_to(guildDict[ctx.guild]['teamA'])
 
 
-@client.command()
+async def abandon_ship(ship, land):
+    for crew in ship.members:
+        await crew.move_to(land)
+    await ship.delete()
+
+
+@client.command(brief=os.getenv('stop_brief'), description=os.getenv('stop_description'))
 async def stop(ctx):
-    if not guildDict[ctx.guild]['scrim']:
-        await ctx.send("This command is to end a scrim,\n you haven't started a scrim,\n "
-                       "how could you end what hasn't began")
+    if guildDict[ctx.guild]['Scrim Lobby'] is None:
+        await ctx.send("Ohh No, that wasn't supposed to happen.")
         return -1
-
-    await guildDict[ctx.guild]['teamA'].delete()
-    guildDict[ctx.guild]['teamA'] = None
-
-    await guildDict[ctx.guild]['teamB'].delete()
-    guildDict[ctx.guild]['teamB'] = None
-
-    await guildDict[ctx.guild]['scrimLobby'].delete()
-    guildDict[ctx.guild]['scrimLobby'] = None
-
-    guildDict[ctx.guild]['scrim'] = False
+    guildDict[ctx.guild]['teamA'] = await load_channel(ctx.guild, 'teamA')
+    if guildDict[ctx.guild]['teamA'] is not None:
+        await abandon_ship(guildDict[ctx.guild]['teamA'], guildDict[ctx.guild]['Scrim Lobby'])
+    guildDict[ctx.guild]['teamB'] = await load_channel(ctx.guild, 'teamB')
+    if guildDict[ctx.guild]['teamB'] is not None:
+        await abandon_ship(guildDict[ctx.guild]['teamB'], guildDict[ctx.guild]['Scrim Lobby'])
 
 
-@client.command()
+@client.command(brief=os.getenv('fuckingStop_brief'), description=os.getenv('fuckingStop_description'))
 async def fuckingStop(ctx):
     guildDict[ctx.guild]['funnyMeme'] = False
     await ctx.send("Sorry, i'll stop.")
 
 
-@client.command()
+@client.command(brief=os.getenv('meme_brief'), description=os.getenv('meme_description'))
 async def meme(ctx):
     guildDict[ctx.guild]['funnyMeme'] = True
     await ctx.send("You Fool!, you have no idea the power you unleashed")
 
 
-@client.command()
+@client.command(brief=os.getenv('coin_brief'), description=os.getenv('coin_description'))
 async def coin(ctx):
     coin = ['heads', 'tails']
     await ctx.send(random.choice(coin))
 
 
-@client.command()
+@client.command(brief=os.getenv('buly_brief'), description=os.getenv('buly_description'))
 async def buly(ctx):
     await ctx.send("{} {}".format(ctx.author.mention, "Damn, can't even spell bully right"))
 
@@ -173,11 +201,11 @@ async def bullyMesage(ctx,message):
 
 
     ident = id_to_int(temp)
-    if ident == 141735904606683137:
+    if ident == int(os.getenv('SHADE_ID')):
         print("Master messaged")
         if random.choice(range(2)) == 1:
             message = "Master is the best"
-    elif ident == 332635642758692864:
+    elif ident == int(os.getenv('CAT_ID')):
         if random.choice(range(10)) == 5:
             message = "SAD CAT next time!"
     await ctx.send("{} {}".format(temp, message))
@@ -191,12 +219,12 @@ def id_to_int(id):
     return int(str)
 
 
-@client.command()
+@client.command(brief=os.getenv('BULLY_BRIEF'), description=os.getenv('BULLY_DESCRIPTION'))
 async def BULLY(ctx):
     await bully(ctx)
 
 
-@client.command()
+@client.command(brief=os.getenv('bullie_brief'), description=os.getenv('bullie_description'))
 async def bully(ctx):
     if random.choice(range(100)) == 50:
         await bullyMesage(ctx, " is the coolest")
@@ -204,18 +232,25 @@ async def bully(ctx):
         await bullyMesage(ctx, random.choice(insults))
 
 
-@client.command()
+@client.command(brief=os.getenv('gay_brief'), description=os.getenv('gay_description'))
 async def gay(ctx):
     await ctx.send(file=discord.File('youGay.png'))
 
 
-@client.command()
+@client.command(brief=os.getenv('catgirl_brief'), description=os.getenv('catgirl_description'))
 async def catgirl(ctx):
     if random.choice(range(10)) == 9:
         await ctx.send(file=discord.File('cap yeet.jpg'))
     else:
         await ctx.send(file=discord.File('Bella.png'))
 
+if __name__ == "__main__":
+    guildDict = {}
 
+    TOKEN = os.getenv('DISCORD_TOKEN')
+    insults = []
+    with open('insults.txt') as file:
+        for line in file:
+            insults.append(line)
 
-client.run(TOKEN)
+    client.run(TOKEN)
