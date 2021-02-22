@@ -96,12 +96,12 @@ async def start(ctx):
 
 
 async def distribute(roster, destinations):
-    print(roster)
+    print([member.nick for member in roster])
     random.shuffle(roster)
-    print(roster)
-    print(destinations)
+    print([member.nick for member in roster])
+    print([channel.name for channel in destinations])
     random.shuffle(destinations)
-    print(destinations)
+    print([channel.name for channel in destinations])
     for i, cannonFodder in enumerate(roster):
         await cannonFodder.move_to(destinations[i % len(destinations)])
 
