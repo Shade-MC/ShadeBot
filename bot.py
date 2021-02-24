@@ -9,8 +9,11 @@ from discord.ext import commands
 from discord.ext.commands import Bot
 from dotenv import load_dotenv
 
+#Bot invite link: https://discord.com/api/oauth2/authorize?client_id=782816994763603978&permissions=8&scope=bot
 
-client = Bot(command_prefix='!')
+intents = discord.Intents.default()
+intents.members = True
+client = Bot(command_prefix='!', intents=intents)
 load_dotenv('.env')
 
 async def load_channel(guild, name):
@@ -108,13 +111,18 @@ async def distribute(roster, destinations):
 
 @client.command(brief=os.getenv('chaos_brief'), description=os.getenv('chaos_description'))
 async def chaos(ctx):
-    if ctx.guild.permissions_for(ctx.author).move_members or ctx.author.id == int(os.getenv('SHADE_ID')):
+    if ctx.author.guild_permissions.move_members or ctx.author.id == int(os.getenv('SHADE_ID')):
+        await ctx.send(f"{ctx.author.nick}, We shall dance together in madness")
+        print(f"{ctx.author.nick}, We shall dance together in madness")
         channelList = []
         memberList = []
         for channel in ctx.guild.voice_channels:
             channelList.append(channel)
             memberList += channel.members
         await distribute(memberList, channelList)
+    else:
+        await ctx.send(f"{ctx.author.nick}, can't let you do that")
+        print(f"{ctx.author.nick}, can't let you do that")
 
 
 @client.command(brief=os.getenv('scramble_brief'), description=os.getenv('scramble_description'))
